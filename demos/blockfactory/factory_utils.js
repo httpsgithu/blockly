@@ -1,21 +1,7 @@
 /**
  * @license
- * Blockly Demos: Block Factory
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
@@ -24,15 +10,14 @@
  * Exporter applications within Blockly Factory. Holds functions to generate
  * block definitions and generator stubs and to create and download files.
  *
- * @author fraser@google.com (Neil Fraser), quachtina96 (Tina Quach)
+ * (Juan Carlos Orozco)
  */
- 'use strict';
+'use strict';
 
 /**
  * Namespace for FactoryUtils.
  */
-goog.provide('FactoryUtils');
-
+var FactoryUtils = FactoryUtils || Object.create(null);
 
 /**
  * Get block definition code for the current block.
@@ -73,19 +58,32 @@ FactoryUtils.cleanBlockType = function(blockType) {
  * Get the generator code for a given block.
  * @param {!Blockly.Block} block Rendered block in preview workspace.
  * @param {string} generatorLanguage 'JavaScript', 'Python', 'PHP', 'Lua',
- *   'Dart'.
+ *     or 'Dart'.
  * @return {string} Generator code for multiple blocks.
  */
 FactoryUtils.getGeneratorStub = function(block, generatorLanguage) {
+  // Build factory blocks from block
+  if (BlockFactory.updateBlocksFlag) {  // TODO: Move this to updatePreview()
+    BlockFactory.mainWorkspace.clear();
+    var xml = BlockDefinitionExtractor.buildBlockFactoryWorkspace(block);
+    Blockly.Xml.domToWorkspace(xml, BlockFactory.mainWorkspace);
+    // Calculate timer to avoid infinite update loops
+    // TODO(#1267): Remove the global variables and any infinite loops.
+    BlockFactory.updateBlocksFlag = false;
+    setTimeout(
+        function() {BlockFactory.updateBlocksFlagDelayed = false;}, 3000);
+  }
+  BlockFactory.lastUpdatedBlock = block; // Variable to share the block value.
+
   function makeVar(root, name) {
     name = name.toLowerCase().replace(/\W/g, '_');
     return '  var ' + root + '_' + name;
   }
   // The makevar function lives in the original update generator.
-  var language = generatorLanguage;
+  var language = generatorLanguage.toLowerCase();
   var code = [];
-  code.push("Blockly." + language + "['" + block.type +
-            "'] = function(block) {");
+  code.push(`${language}.${language}Generator.forBlock['${block.type}'] = ` +
+            'function(block, generator) {');
 
   // Generate getters for any fields or inputs.
   for (var i = 0, input; input = block.inputList[i]; i++) {
@@ -95,54 +93,43 @@ FactoryUtils.getGeneratorStub = function(block, generatorLanguage) {
         continue;
       }
       if (field instanceof Blockly.FieldVariable) {
-        // Subclass of Blockly.FieldDropdown, must test first.
-        code.push(makeVar('variable', name) +
-                  " = Blockly." + language +
-                  ".variableDB_.getName(block.getFieldValue('" + name +
-                  "'), Blockly.Variables.NAME_TYPE);");
-      } else if (field instanceof Blockly.FieldAngle) {
-        // Subclass of Blockly.FieldTextInput, must test first.
-        code.push(makeVar('angle', name) +
-                  " = block.getFieldValue('" + name + "');");
-      } else if (Blockly.FieldDate && field instanceof Blockly.FieldDate) {
-        // Blockly.FieldDate may not be compiled into Blockly.
-        code.push(makeVar('date', name) +
-                  " = block.getFieldValue('" + name + "');");
-      } else if (field instanceof Blockly.FieldColour) {
-        code.push(makeVar('colour', name) +
-                  " = block.getFieldValue('" + name + "');");
+        // FieldVariable is subclass of FieldDropdown; must test first.
+        code.push(`${makeVar('variable', name)} = ` +
+                  `generator.nameDB_.getName(block.getFieldValue('${name}'), ` +
+                  `Blockly.Variables.NAME_TYPE);`);
       } else if (field instanceof Blockly.FieldCheckbox) {
-        code.push(makeVar('checkbox', name) +
-                  " = block.getFieldValue('" + name + "') == 'TRUE';");
-      } else if (field instanceof Blockly.FieldDropdown) {
-        code.push(makeVar('dropdown', name) +
-                  " = block.getFieldValue('" + name + "');");
-      } else if (field instanceof Blockly.FieldNumber) {
-        code.push(makeVar('number', name) +
-                  " = block.getFieldValue('" + name + "');");
-      } else if (field instanceof Blockly.FieldTextInput) {
-        code.push(makeVar('text', name) +
-                  " = block.getFieldValue('" + name + "');");
+        code.push(`${makeVar('checkbox', name)} = ` +
+                  `block.getFieldValue('${name}') === 'TRUE';`);
+      } else {
+        let prefix =
+            // Angle is subclass of FieldTextInput; must test first.
+            field instanceof Blockly.FieldAngle ? 'angle' :
+            field instanceof Blockly.FieldColour ? 'colour' :
+            field instanceof Blockly.FieldDropdown ? 'dropdown' :
+            field instanceof Blockly.FieldNumber ? 'number' :
+            field instanceof Blockly.FieldTextInput ? 'text' :
+            'field';  // Default if subclass not found.
+        code.push(`${makeVar(prefix, name)} = block.getFieldValue('${name}');`);
       }
     }
     var name = input.name;
     if (name) {
-      if (input.type == Blockly.INPUT_VALUE) {
-        code.push(makeVar('value', name) +
-                  " = Blockly." + language + ".valueToCode(block, '" + name +
-                  "', Blockly." + language + ".ORDER_ATOMIC);");
-      } else if (input.type == Blockly.NEXT_STATEMENT) {
-        code.push(makeVar('statements', name) +
-                  " = Blockly." + language + ".statementToCode(block, '" +
-                  name + "');");
+      if (input.type === Blockly.INPUT_VALUE) {
+        code.push(`${makeVar('value', name)} = ` +
+                  `generator.valueToCode(block, '${name}', ` +
+                  `${language}.Order.ATOMIC);`);
+      } else if (input.type === Blockly.NEXT_STATEMENT) {
+        code.push(`${makeVar('statements', name)} = ` +
+                  `generator.statementToCode(block, '${name}');`);
       }
     }
   }
-  // Most languages end lines with a semicolon.  Python does not.
+  // Most languages end lines with a semicolon.  Python & Lua do not.
   var lineEnd = {
     'JavaScript': ';',
     'Python': '',
     'PHP': ';',
+    'Lua': '',
     'Dart': ';'
   };
   code.push("  // TODO: Assemble " + language + " into code variable.");
@@ -163,7 +150,7 @@ FactoryUtils.getGeneratorStub = function(block, generatorLanguage) {
  * Update the language code as JSON.
  * @param {string} blockType Name of block.
  * @param {!Blockly.Block} rootBlock Factory_base block.
- * @return {string} Generanted language code.
+ * @return {string} Generated language code.
  * @private
  */
 FactoryUtils.formatJson_ = function(blockType, rootBlock) {
@@ -176,11 +163,11 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
   var contentsBlock = rootBlock.getInputTargetBlock('INPUTS');
   var lastInput = null;
   while (contentsBlock) {
-    if (!contentsBlock.disabled && !contentsBlock.getInheritedDisabled()) {
+    if (contentsBlock.isEnabled() && !contentsBlock.getInheritedDisabled()) {
       var fields = FactoryUtils.getFieldsJson_(
           contentsBlock.getInputTargetBlock('FIELDS'));
       for (var i = 0; i < fields.length; i++) {
-        if (typeof fields[i] == 'string') {
+        if (typeof fields[i] === 'string') {
           message.push(fields[i].replace(/%/g, '%%'));
         } else {
           args.push(fields[i]);
@@ -190,7 +177,8 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
 
       var input = {type: contentsBlock.type};
       // Dummy inputs don't have names.  Other inputs do.
-      if (contentsBlock.type != 'input_dummy') {
+      if (contentsBlock.type !== 'input_dummy' &&
+          contentsBlock.type !== 'input_end_row') {
         input.name = contentsBlock.getFieldValue('INPUTNAME');
       }
       var check = JSON.parse(
@@ -199,7 +187,7 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
         input.check = check;
       }
       var align = contentsBlock.getFieldValue('ALIGN');
-      if (align != 'LEFT') {
+      if (align !== 'LEFT') {
         input.align = align;
       }
       args.push(input);
@@ -210,12 +198,12 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
         contentsBlock.nextConnection.targetBlock();
   }
   // Remove last input if dummy and not empty.
-  if (lastInput && lastInput.type == 'input_dummy') {
+  if (lastInput && lastInput.type === 'input_dummy') {
     var fields = lastInput.getInputTargetBlock('FIELDS');
-    if (fields && FactoryUtils.getFieldsJson_(fields).join('').trim() != '') {
+    if (fields && FactoryUtils.getFieldsJson_(fields).join('').trim() !== '') {
       var align = lastInput.getFieldValue('ALIGN');
-      if (align != 'LEFT') {
-        JS.lastDummyAlign0 = align;
+      if (align !== 'LEFT') {
+        JS.implicitAlign0 = align;
       }
       args.pop();
       message.pop();
@@ -226,9 +214,9 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
     JS.args0 = args;
   }
   // Generate inline/external switch.
-  if (rootBlock.getFieldValue('INLINE') == 'EXT') {
+  if (rootBlock.getFieldValue('INLINE') === 'EXT') {
     JS.inputsInline = false;
-  } else if (rootBlock.getFieldValue('INLINE') == 'INT') {
+  } else if (rootBlock.getFieldValue('INLINE') === 'INT') {
     JS.inputsInline = true;
   }
   // Generate output, or next/previous connections.
@@ -259,7 +247,7 @@ FactoryUtils.formatJson_ = function(blockType, rootBlock) {
   }
   // Generate colour.
   var colourBlock = rootBlock.getInputTargetBlock('COLOUR');
-  if (colourBlock && !colourBlock.disabled) {
+  if (colourBlock && colourBlock.isEnabled()) {
     var hue = parseInt(colourBlock.getFieldValue('HUE'), 10);
     JS.colour = hue;
   }
@@ -285,13 +273,15 @@ FactoryUtils.formatJavaScript_ = function(blockType, rootBlock, workspace) {
   // Generate inputs.
   var TYPES = {'input_value': 'appendValueInput',
                'input_statement': 'appendStatementInput',
-               'input_dummy': 'appendDummyInput'};
+               'input_dummy': 'appendDummyInput',
+               'input_end_row': 'appendEndRowInput'};
   var contentsBlock = rootBlock.getInputTargetBlock('INPUTS');
   while (contentsBlock) {
-    if (!contentsBlock.disabled && !contentsBlock.getInheritedDisabled()) {
+    if (contentsBlock.isEnabled() && !contentsBlock.getInheritedDisabled()) {
       var name = '';
       // Dummy inputs don't have names.  Other inputs do.
-      if (contentsBlock.type != 'input_dummy') {
+      if (contentsBlock.type !== 'input_dummy' &&
+          contentsBlock.type !== 'input_end_row') {
         name =
             JSON.stringify(contentsBlock.getFieldValue('INPUTNAME'));
       }
@@ -301,7 +291,7 @@ FactoryUtils.formatJavaScript_ = function(blockType, rootBlock, workspace) {
         code.push('        .setCheck(' + check + ')');
       }
       var align = contentsBlock.getFieldValue('ALIGN');
-      if (align != 'LEFT') {
+      if (align !== 'LEFT') {
         code.push('        .setAlign(Blockly.ALIGN_' + align + ')');
       }
       var fields = FactoryUtils.getFieldsJs_(
@@ -316,9 +306,9 @@ FactoryUtils.formatJavaScript_ = function(blockType, rootBlock, workspace) {
         contentsBlock.nextConnection.targetBlock();
   }
   // Generate inline/external switch.
-  if (rootBlock.getFieldValue('INLINE') == 'EXT') {
+  if (rootBlock.getFieldValue('INLINE') === 'EXT') {
     code.push('    this.setInputsInline(false);');
-  } else if (rootBlock.getFieldValue('INLINE') == 'INT') {
+  } else if (rootBlock.getFieldValue('INLINE') === 'INT') {
     code.push('    this.setInputsInline(true);');
   }
   // Generate output, or next/previous connections.
@@ -343,7 +333,7 @@ FactoryUtils.formatJavaScript_ = function(blockType, rootBlock, workspace) {
   }
   // Generate colour.
   var colourBlock = rootBlock.getInputTargetBlock('COLOUR');
-  if (colourBlock && !colourBlock.disabled) {
+  if (colourBlock && colourBlock.isEnabled()) {
     var hue = parseInt(colourBlock.getFieldValue('HUE'), 10);
     if (!isNaN(hue)) {
       code.push('    this.setColour(' + hue + ');');
@@ -381,17 +371,23 @@ FactoryUtils.connectionLineJs_ = function(functionName, typeName, workspace) {
 /**
  * Returns field strings and any config.
  * @param {!Blockly.Block} block Input block.
- * @return {!Array.<string>} Field strings.
+ * @return {!Array<string>} Field strings.
  * @private
  */
 FactoryUtils.getFieldsJs_ = function(block) {
   var fields = [];
   while (block) {
-    if (!block.disabled && !block.getInheritedDisabled()) {
+    if (block.isEnabled() && !block.getInheritedDisabled()) {
       switch (block.type) {
         case 'field_static':
           // Result: 'hello'
           fields.push(JSON.stringify(block.getFieldValue('TEXT')));
+          break;
+        case 'field_label_serializable':
+          // Result: new Blockly.FieldLabelSerializable('Hello'), 'GREET'
+          fields.push('new Blockly.FieldLabelSerializable(' +
+              JSON.stringify(block.getFieldValue('TEXT')) + '), ' +
+              JSON.stringify(block.getFieldValue('FIELDNAME')));
           break;
         case 'field_input':
           // Result: new Blockly.FieldTextInput('Hello'), 'GREET'
@@ -408,11 +404,11 @@ FactoryUtils.getFieldsJs_ = function(block) {
             Number(block.getFieldValue('PRECISION'))
           ];
           // Remove any trailing arguments that aren't needed.
-          if (args[3] == 0) {
+          if (args[3] === 0) {
             args.pop();
-            if (args[2] == Infinity) {
+            if (args[2] === Infinity) {
               args.pop();
-              if (args[1] == -Infinity) {
+              if (args[1] === -Infinity) {
                 args.pop();
               }
             }
@@ -423,7 +419,7 @@ FactoryUtils.getFieldsJs_ = function(block) {
         case 'field_angle':
           // Result: new Blockly.FieldAngle(90), 'ANGLE'
           fields.push('new Blockly.FieldAngle(' +
-              parseFloat(block.getFieldValue('ANGLE')) + '), ' +
+              Number(block.getFieldValue('ANGLE')) + '), ' +
               JSON.stringify(block.getFieldValue('FIELDNAME')));
           break;
         case 'field_checkbox':
@@ -438,12 +434,6 @@ FactoryUtils.getFieldsJs_ = function(block) {
           fields.push('new Blockly.FieldColour(' +
               JSON.stringify(block.getFieldValue('COLOUR')) +
               '), ' +
-              JSON.stringify(block.getFieldValue('FIELDNAME')));
-          break;
-        case 'field_date':
-          // Result: new Blockly.FieldDate('2015-02-04'), 'DATE'
-          fields.push('new Blockly.FieldDate(' +
-              JSON.stringify(block.getFieldValue('DATE')) + '), ' +
               JSON.stringify(block.getFieldValue('FIELDNAME')));
           break;
         case 'field_variable':
@@ -473,8 +463,10 @@ FactoryUtils.getFieldsJs_ = function(block) {
           var width = Number(block.getFieldValue('WIDTH'));
           var height = Number(block.getFieldValue('HEIGHT'));
           var alt = JSON.stringify(block.getFieldValue('ALT'));
+          var flipRtl = JSON.stringify(block.getFieldValue('FLIP_RTL'));
           fields.push('new Blockly.FieldImage(' +
-              src + ', ' + width + ', ' + height + ', ' + alt + ')');
+              src + ', ' + width + ', ' + height +
+              ', { alt: ' + alt + ', flipRtl: ' + flipRtl + ' })');
           break;
       }
     }
@@ -486,17 +478,24 @@ FactoryUtils.getFieldsJs_ = function(block) {
 /**
  * Returns field strings and any config.
  * @param {!Blockly.Block} block Input block.
- * @return {!Array.<string|!Object>} Array of static text and field configs.
+ * @return {!Array<string|!Object>} Array of static text and field configs.
  * @private
  */
 FactoryUtils.getFieldsJson_ = function(block) {
   var fields = [];
   while (block) {
-    if (!block.disabled && !block.getInheritedDisabled()) {
+    if (block.isEnabled() && !block.getInheritedDisabled()) {
       switch (block.type) {
         case 'field_static':
           // Result: 'hello'
           fields.push(block.getFieldValue('TEXT'));
+          break;
+        case 'field_label_serializable':
+          fields.push({
+            type: block.type,
+            name: block.getFieldValue('FIELDNAME'),
+            text: block.getFieldValue('TEXT')
+          });
           break;
         case 'field_input':
           fields.push({
@@ -509,17 +508,17 @@ FactoryUtils.getFieldsJson_ = function(block) {
           var obj = {
             type: block.type,
             name: block.getFieldValue('FIELDNAME'),
-            value: parseFloat(block.getFieldValue('VALUE'))
+            value: Number(block.getFieldValue('VALUE'))
           };
-          var min = parseFloat(block.getFieldValue('MIN'));
+          var min = Number(block.getFieldValue('MIN'));
           if (min > -Infinity) {
             obj.min = min;
           }
-          var max = parseFloat(block.getFieldValue('MAX'));
+          var max = Number(block.getFieldValue('MAX'));
           if (max < Infinity) {
             obj.max = max;
           }
-          var precision = parseFloat(block.getFieldValue('PRECISION'));
+          var precision = Number(block.getFieldValue('PRECISION'));
           if (precision) {
             obj.precision = precision;
           }
@@ -536,7 +535,7 @@ FactoryUtils.getFieldsJson_ = function(block) {
           fields.push({
             type: block.type,
             name: block.getFieldValue('FIELDNAME'),
-            checked: block.getFieldValue('CHECKED') == 'TRUE'
+            checked: block.getFieldValue('CHECKED') === 'TRUE'
           });
           break;
         case 'field_colour':
@@ -544,13 +543,6 @@ FactoryUtils.getFieldsJson_ = function(block) {
             type: block.type,
             name: block.getFieldValue('FIELDNAME'),
             colour: block.getFieldValue('COLOUR')
-          });
-          break;
-        case 'field_date':
-          fields.push({
-            type: block.type,
-            name: block.getFieldValue('FIELDNAME'),
-            date: block.getFieldValue('DATE')
           });
           break;
         case 'field_variable':
@@ -580,7 +572,8 @@ FactoryUtils.getFieldsJson_ = function(block) {
             src: block.getFieldValue('SRC'),
             width: Number(block.getFieldValue('WIDTH')),
             height: Number(block.getFieldValue('HEIGHT')),
-            alt: block.getFieldValue('ALT')
+            alt: block.getFieldValue('ALT'),
+            flipRtl: block.getFieldValue('FLIP_RTL') === 'TRUE'
           });
           break;
       }
@@ -599,11 +592,11 @@ FactoryUtils.getFieldsJson_ = function(block) {
  */
 FactoryUtils.getOptTypesFrom = function(block, name) {
   var types = FactoryUtils.getTypesFrom_(block, name);
-  if (types.length == 0) {
+  if (types.length === 0) {
     return undefined;
-  } else if (types.indexOf('null') != -1) {
+  } else if (types.includes('null')) {
     return 'null';
-  } else if (types.length == 1) {
+  } else if (types.length === 1) {
     return types[0];
   } else {
     return '[' + types.join(', ') + ']';
@@ -615,17 +608,17 @@ FactoryUtils.getOptTypesFrom = function(block, name) {
  * Fetch the type(s) defined in the given input.
  * @param {!Blockly.Block} block Block with input.
  * @param {string} name Name of the input.
- * @return {!Array.<string>} List of types.
+ * @return {!Array<string>} List of types.
  * @private
  */
 FactoryUtils.getTypesFrom_ = function(block, name) {
   var typeBlock = block.getInputTargetBlock(name);
   var types;
-  if (!typeBlock || typeBlock.disabled) {
+  if (!typeBlock || !typeBlock.isEnabled()) {
     types = [];
-  } else if (typeBlock.type == 'type_other') {
+  } else if (typeBlock.type === 'type_other') {
     types = [JSON.stringify(typeBlock.getFieldValue('TYPE'))];
-  } else if (typeBlock.type == 'type_group') {
+  } else if (typeBlock.type === 'type_group') {
     types = [];
     for (var n = 0; n < typeBlock.typeCount_; n++) {
       types = types.concat(FactoryUtils.getTypesFrom_(typeBlock, 'TYPE' + n));
@@ -653,7 +646,7 @@ FactoryUtils.getTypesFrom_ = function(block, name) {
 FactoryUtils.getRootBlock = function(workspace) {
   var blocks = workspace.getTopBlocks(false);
   for (var i = 0, block; block = blocks[i]; i++) {
-    if (block.type == 'factory_base') {
+    if (block.type === 'factory_base') {
       return block;
     }
   }
@@ -736,23 +729,23 @@ FactoryUtils.getDefinedBlock = function(blockType, workspace) {
 FactoryUtils.getBlockTypeFromJsDefinition = function(blockDef) {
   var indexOfStartBracket = blockDef.indexOf('[\'');
   var indexOfEndBracket = blockDef.indexOf('\']');
-  if (indexOfStartBracket != -1 && indexOfEndBracket != -1) {
+  if (indexOfStartBracket !== -1 && indexOfEndBracket !== -1) {
     return blockDef.substring(indexOfStartBracket + 2, indexOfEndBracket);
   } else {
-    throw new Error ('Could not parse block type out of JavaScript block ' +
+    throw Error('Could not parse block type out of JavaScript block ' +
         'definition. Brackets normally enclosing block type not found.');
   }
 };
 
 /**
  * Generates a category containing blocks of the specified block types.
- * @param {!Array.<!Blockly.Block>} blocks Blocks to include in the category.
+ * @param {!Array<!Blockly.Block>} blocks Blocks to include in the category.
  * @param {string} categoryName Name to use for the generated category.
  * @return {!Element} Category XML containing the given block types.
  */
 FactoryUtils.generateCategoryXml = function(blocks, categoryName) {
   // Create category DOM element.
-  var categoryElement = goog.dom.createDom('category');
+  var categoryElement = Blockly.utils.xml.createElement('category');
   categoryElement.setAttribute('name', categoryName);
 
   // For each block, add block element to category.
@@ -772,15 +765,15 @@ FactoryUtils.generateCategoryXml = function(blocks, categoryName) {
  * Parses a string containing JavaScript block definition(s) to create an array
  * in which each element is a single block definition.
  * @param {string} blockDefsString JavaScript block definition(s).
- * @return {!Array.<string>} Array of block definitions.
+ * @return {!Array<string>} Array of block definitions.
  */
 FactoryUtils.parseJsBlockDefinitions = function(blockDefsString) {
   var blockDefArray = [];
   var defStart = blockDefsString.indexOf('Blockly.Blocks');
 
-  while (blockDefsString.indexOf('Blockly.Blocks', defStart) != -1) {
+  while (blockDefsString.includes('Blockly.Blocks', defStart)) {
     var nextStart = blockDefsString.indexOf('Blockly.Blocks', defStart + 1);
-    if (nextStart == -1) {
+    if (nextStart === -1) {
       // This is the last block definition.
       nextStart = blockDefsString.length;
     }
@@ -798,7 +791,7 @@ FactoryUtils.parseJsBlockDefinitions = function(blockDefsString) {
  * JSON objects.
  * @param {string} blockDefsString String containing JSON block
  *    definition(s).
- * @return {!Array.<string>} Array of block definitions.
+ * @return {!Array<string>} Array of block definitions.
  */
 FactoryUtils.parseJsonBlockDefinitions = function(blockDefsString) {
   var blockDefArray = [];
@@ -808,13 +801,13 @@ FactoryUtils.parseJsonBlockDefinitions = function(blockDefsString) {
   // are balanced.
   for (var i = 0; i < blockDefsString.length; i++) {
     var currentChar = blockDefsString[i];
-    if (currentChar == '{') {
+    if (currentChar === '{') {
       unbalancedBracketCount++;
     }
-    else if (currentChar == '}') {
+    else if (currentChar === '}') {
       unbalancedBracketCount--;
-      if (unbalancedBracketCount == 0 && i > 0) {
-        // The brackets are balanced. We've got a complete block defintion.
+      if (unbalancedBracketCount === 0 && i > 0) {
+        // The brackets are balanced. We've got a complete block definition.
         var blockDef = blockDefsString.substring(defStart, i + 1);
         blockDefArray.push(blockDef);
         defStart = i + 1;
@@ -828,13 +821,13 @@ FactoryUtils.parseJsonBlockDefinitions = function(blockDefsString) {
  * Define blocks from imported block definitions.
  * @param {string} blockDefsString Block definition(s).
  * @param {string} format Block definition format ('JSON' or 'JavaScript').
- * @return {!Array.<!Element>} Array of block types defined.
+ * @return {!Array<!Element>} Array of block types defined.
  */
 FactoryUtils.defineAndGetBlockTypes = function(blockDefsString, format) {
   var blockTypes = [];
 
   // Define blocks and get block types.
-  if (format == 'JSON') {
+  if (format === 'JSON') {
     var blockDefArray = FactoryUtils.parseJsonBlockDefinitions(blockDefsString);
 
     // Populate array of blocktypes and define each block.
@@ -849,7 +842,7 @@ FactoryUtils.defineAndGetBlockTypes = function(blockDefsString, format) {
         }
       };
     }
-  } else if (format == 'JavaScript') {
+  } else if (format === 'JavaScript') {
     var blockDefArray = FactoryUtils.parseJsBlockDefinitions(blockDefsString);
 
     // Populate array of block types.
@@ -874,9 +867,9 @@ FactoryUtils.defineAndGetBlockTypes = function(blockDefsString, format) {
 FactoryUtils.injectCode = function(code, id) {
   var pre = document.getElementById(id);
   pre.textContent = code;
-  code = pre.textContent;
-  code = PR.prettyPrintOne(code, 'js');
-  pre.innerHTML = code;
+  // Remove the 'prettyprinted' class, so that Prettify will recalculate.
+  pre.className = pre.className.replace('prettyprinted', '');
+  PR.prettyPrint();
 };
 
 /**
@@ -891,33 +884,77 @@ FactoryUtils.injectCode = function(code, id) {
  */
 FactoryUtils.sameBlockXml = function(blockXml1, blockXml2) {
   // Each XML element should contain a single child element with a 'block' tag
-  if (blockXml1.tagName.toLowerCase() != 'xml' ||
-      blockXml2.tagName.toLowerCase() != 'xml') {
-    throw new Error('Expected two XML elements, recieved elements with tag ' +
+  if (blockXml1.tagName.toLowerCase() !== 'xml' ||
+      blockXml2.tagName.toLowerCase() !== 'xml') {
+    throw Error('Expected two XML elements, received elements with tag ' +
         'names: ' + blockXml1.tagName + ' and ' + blockXml2.tagName + '.');
   }
 
   // Compare the block elements directly. The XML tags may include other meta
-  // information we want to igrore.
+  // information we want to ignore.
   var blockElement1 = blockXml1.getElementsByTagName('block')[0];
   var blockElement2 = blockXml2.getElementsByTagName('block')[0];
 
   if (!(blockElement1 && blockElement2)) {
-    throw new Error('Could not get find block element in XML.');
+    throw Error('Could not get find block element in XML.');
   }
 
-  var blockXmlText1 = Blockly.Xml.domToText(blockElement1);
-  var blockXmlText2 = Blockly.Xml.domToText(blockElement2);
+  var cleanBlockXml1 = FactoryUtils.cleanXml(blockElement1);
+  var cleanBlockXml2 = FactoryUtils.cleanXml(blockElement2);
+
+  var blockXmlText1 = Blockly.Xml.domToText(cleanBlockXml1);
+  var blockXmlText2 = Blockly.Xml.domToText(cleanBlockXml2);
 
   // Strip white space.
   blockXmlText1 = blockXmlText1.replace(/\s+/g, '');
   blockXmlText2 = blockXmlText2.replace(/\s+/g, '');
 
   // Return whether or not changes have been saved.
-  return blockXmlText1 == blockXmlText2;
+  return blockXmlText1 === blockXmlText2;
 };
 
-/*
+/**
+ * Strips the provided xml of any attributes that don't describe the
+ * 'structure' of the blocks (i.e. block order, field values, etc).
+ * @param {Node} xml The xml to clean.
+ * @return {Node}
+ */
+FactoryUtils.cleanXml = function(xml) {
+  var newXml = xml.cloneNode(true);
+  var node = newXml;
+  while (node) {
+    // Things like text inside tags are still treated as nodes, but they
+    // don't have attributes (or the removeAttribute function) so we can
+    // skip removing attributes from them.
+    if (node.removeAttribute) {
+      node.removeAttribute('xmlns');
+      node.removeAttribute('x');
+      node.removeAttribute('y');
+      node.removeAttribute('id');
+    }
+
+    // Try to go down the tree
+    var nextNode = node.firstChild || node.nextSibling;
+    // If we can't go down, try to go back up the tree.
+    if (!nextNode) {
+      nextNode = node.parentNode;
+      while (nextNode) {
+        // We are valid again!
+        if (nextNode.nextSibling) {
+          nextNode = nextNode.nextSibling;
+          break;
+        }
+        // Try going up again. If parentNode is null that means we have
+        // reached the top, and we will break out of both loops.
+        nextNode = nextNode.parentNode;
+      }
+    }
+    node = nextNode;
+  }
+  return newXml;
+};
+
+/**
  * Checks if a block has a variable field. Blocks with variable fields cannot
  * be shadow blocks.
  * @param {Blockly.Block} block The block to check if a variable field exists.
@@ -939,11 +976,11 @@ FactoryUtils.hasVariableField = function(block) {
  */
 FactoryUtils.isProcedureBlock = function(block) {
   return block &&
-      (block.type == 'procedures_defnoreturn' ||
-      block.type == 'procedures_defreturn' ||
-      block.type == 'procedures_callnoreturn' ||
-      block.type == 'procedures_callreturn' ||
-      block.type == 'procedures_ifreturn');
+      (block.type === 'procedures_defnoreturn' ||
+      block.type === 'procedures_defreturn' ||
+      block.type === 'procedures_callnoreturn' ||
+      block.type === 'procedures_callreturn' ||
+      block.type === 'procedures_ifreturn');
 };
 
 /**
@@ -978,7 +1015,7 @@ FactoryUtils.savedBlockChanges = function(blockLibraryController) {
  */
 FactoryUtils.getTooltipFromRootBlock_ = function(rootBlock) {
   var tooltipBlock = rootBlock.getInputTargetBlock('TOOLTIP');
-  if (tooltipBlock && !tooltipBlock.disabled) {
+  if (tooltipBlock && tooltipBlock.isEnabled()) {
     return tooltipBlock.getFieldValue('TEXT');
   }
   return '';
@@ -992,7 +1029,7 @@ FactoryUtils.getTooltipFromRootBlock_ = function(rootBlock) {
  */
 FactoryUtils.getHelpUrlFromRootBlock_ = function(rootBlock) {
   var helpUrlBlock = rootBlock.getInputTargetBlock('HELPURL');
-  if (helpUrlBlock && !helpUrlBlock.disabled) {
+  if (helpUrlBlock && helpUrlBlock.isEnabled()) {
     return helpUrlBlock.getFieldValue('TEXT');
   }
   return '';

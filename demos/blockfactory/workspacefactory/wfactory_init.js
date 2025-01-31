@@ -1,21 +1,7 @@
 /**
  * @license
- * Blockly Demos: Block Factory
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
@@ -23,11 +9,7 @@
  * Adds click handlers to buttons and dropdowns, adds event listeners for
  * keydown events and Blockly events, and configures the initial setup of
  * the page.
- *
- * @author Emma Dauterman (evd2014)
  */
-
- goog.require('FactoryUtils');
 
 /**
  * Namespace for workspace factory initialization methods.
@@ -47,7 +29,7 @@ WorkspaceFactoryInit.initWorkspaceFactory = function(controller) {
   document.getElementById('button_down').disabled = true;
   document.getElementById('button_editCategory').disabled = true;
 
-  this.initColorPicker_(controller);
+  this.initColourPicker_(controller);
   this.addWorkspaceFactoryEventListeners_(controller);
   this.assignWorkspaceFactoryClickHandlers_(controller);
   this.addWorkspaceFactoryOptionsListeners_(controller);
@@ -57,98 +39,37 @@ WorkspaceFactoryInit.initWorkspaceFactory = function(controller) {
 };
 
 /**
- * Initialize the color picker in workspace factory.
+ * Initialize the colour picker in workspace factory.
  * @param {!FactoryController} controller The controller for the workspace
  *    factory tab.
  * @private
  */
-WorkspaceFactoryInit.initColorPicker_ = function(controller) {
-  // Array of Blockly category colours, consitent with the 15 degree default
-  // of the block factory's colour wheel.
-  var colours = [];
-  for (var hue = 0; hue < 360; hue += 15) {
-    colours.push(WorkspaceFactoryInit.hsvToHex_(hue,
-        Blockly.HSV_SATURATION, Blockly.HSV_VALUE));
-  }
-
-  // Create color picker with specific set of Blockly colours.
-  var colourPicker = new goog.ui.ColorPicker();
-  colourPicker.setSize(6);
-  colourPicker.setColors(colours);
-
-  // Create and render the popup colour picker and attach to button.
-  var popupPicker = new goog.ui.PopupColorPicker(null, colourPicker);
-  popupPicker.render();
-  popupPicker.attach(document.getElementById('dropdown_color'));
-  popupPicker.setFocusable(true);
-  goog.events.listen(popupPicker, 'change', function(e) {
-    controller.changeSelectedCategoryColor(popupPicker.getSelectedColor());
-    blocklyFactory.closeModal();
-  });
-};
-
-/**
- * Converts from h,s,v values to a hex string
- * @param {number} h Hue, in [0, 360].
- * @param {number} s Saturation, in [0, 1].
- * @param {number} v Value, in [0, 1].
- * @return {string} hex representation of the color.
- * @private
- */
-WorkspaceFactoryInit.hsvToHex_ = function(h, s, v) {
-  var brightness = v * 255;
-  var red = 0;
-  var green = 0;
-  var blue = 0;
-  if (s == 0) {
-    red = brightness;
-    green = brightness;
-    blue = brightness;
-  } else {
-    var sextant = Math.floor(h / 60);
-    var remainder = (h / 60) - sextant;
-    var val1 = brightness * (1 - s);
-    var val2 = brightness * (1 - (s * remainder));
-    var val3 = brightness * (1 - (s * (1 - remainder)));
-    switch (sextant) {
-      case 1:
-        red = val2;
-        green = brightness;
-        blue = val1;
-        break;
-      case 2:
-        red = val1;
-        green = brightness;
-        blue = val3;
-        break;
-      case 3:
-        red = val1;
-        green = val2;
-        blue = brightness;
-        break;
-      case 4:
-        red = val3;
-        green = val1;
-        blue = brightness;
-        break;
-      case 5:
-        red = brightness;
-        green = val1;
-        blue = val2;
-        break;
-      case 6:
-      case 0:
-        red = brightness;
-        green = val3;
-        blue = val1;
-        break;
+WorkspaceFactoryInit.initColourPicker_ = function(controller) {
+  // Array of Blockly category colours, consistent with the colour defaults.
+  var colours = [20, 65, 120, 160, 210, 230, 260, 290, 330, ''];
+  // Convert hue numbers to RRGGBB strings.
+  for (var i = 0; i < colours.length; i++) {
+    if (colours[i] !== '') {
+      colours[i] = Blockly.utils.colour.hueToHex(colours[i]).substring(1);
     }
   }
+  // Convert to 2D array.
+  var maxCols = Math.ceil(Math.sqrt(colours.length));
+  var grid = [];
+  var row = [];
+  for (var i = 0; i < colours.length; i++) {
+    row.push(colours[i]);
+    if (row.length === maxCols) {
+      grid.push(row);
+      row = [];
+    }
+  }
+  if (row.length) {
+    grid.push(row);
+  }
 
-  var hexR = ('0' + Math.floor(red).toString(16)).slice(-2);
-  var hexG = ('0' + Math.floor(green).toString(16)).slice(-2);
-  var hexB = ('0' + Math.floor(blue).toString(16)).slice(-2);
-  return '#' + hexR + hexG + hexB;
+  // Override the default colours.
+  cp_grid = grid;
 };
 
 /**
@@ -310,12 +231,27 @@ WorkspaceFactoryInit.assignWorkspaceFactoryClickHandlers_ =
   document.getElementById('button_editCategory').addEventListener
       ('click',
       function() {
+        var selected = controller.model.getSelected();
+        // Return if a category is not selected.
+        if (selected.type !== ListElement.TYPE_CATEGORY) {
+          return;
+        }
+        document.getElementById('categoryName').value = selected.name;
+        document.getElementById('categoryColour').value = selected.colour ?
+            selected.colour.substring(1).toLowerCase() : '';
+        console.log(document.getElementById('categoryColour').value);
+        // Link the colour picker to the field.
+        cp_init('categoryColour');
         blocklyFactory.openModal('dropdownDiv_editCategory');
       });
-  document.getElementById('dropdown_name').addEventListener
+
+  document.getElementById('categorySave').addEventListener
       ('click',
       function() {
-        controller.changeCategoryName();
+        var name = document.getElementById('categoryName').value.trim();
+        var colour = document.getElementById('categoryColour').value;
+        colour = colour ? '#' + colour : null;
+        controller.changeSelectedCategory(name, colour);
         blocklyFactory.closeModal();
       });
 
@@ -336,7 +272,7 @@ WorkspaceFactoryInit.assignWorkspaceFactoryClickHandlers_ =
 
         // Disable shadow editing button if turning invalid shadow block back
         // to normal block.
-        if (!Blockly.selected.getSurroundParent()) {
+        if (!Blockly.common.getSelected().getSurroundParent()) {
           document.getElementById('button_addShadow').disabled = true;
         }
       });
@@ -366,14 +302,14 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
     // Don't let arrow keys have any effect if not in Workspace Factory
     // editing the toolbox.
     if (!(controller.keyEventsEnabled && controller.selectedMode
-        == WorkspaceFactoryController.MODE_TOOLBOX)) {
+        === WorkspaceFactoryController.MODE_TOOLBOX)) {
       return;
     }
 
-    if (e.keyCode == 38) {
+    if (e.keyCode === 38) {
       // Arrow up.
       controller.moveElement(-1);
-    } else if (e.keyCode == 40) {
+    } else if (e.keyCode === 40) {
       // Arrow down.
       controller.moveElement(1);
     }
@@ -396,9 +332,9 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
     // Not listening for Blockly create events because causes the user to drop
     // blocks when dragging them into workspace. Could cause problems if ever
     // load blocks into workspace directly without calling updatePreview.
-    if (e.type == Blockly.Events.BLOCK_MOVE ||
-          e.type == Blockly.Events.BLOCK_DELETE ||
-          e.type == Blockly.Events.BLOCK_CHANGE) {
+    if (e.type === Blockly.Events.BLOCK_MOVE ||
+          e.type === Blockly.Events.BLOCK_DELETE ||
+          e.type === Blockly.Events.BLOCK_CHANGE) {
       controller.saveStateFromWorkspace();
       controller.updatePreview();
     }
@@ -407,9 +343,9 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
     // Only enable "Edit Block" when a block is selected and it has a
     // surrounding parent, meaning it is nested in another block (blocks that
     // are not nested in parents cannot be shadow blocks).
-    if (e.type == Blockly.Events.BLOCK_MOVE || (e.type == Blockly.Events.UI &&
-        e.element == 'selected')) {
-      var selected = Blockly.selected;
+    if (e.type === Blockly.Events.BLOCK_MOVE ||
+        e.type === Blockly.Events.SELECTED) {
+      var selected = Blockly.common.getSelected();
 
       // Show shadow button if a block is selected. Show "Add Shadow" if
       // a block is not a shadow block, show "Remove Shadow" if it is a
@@ -423,7 +359,7 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
         WorkspaceFactoryInit.displayRemoveShadow_(false);
       }
 
-      if (selected != null && selected.getSurroundParent() != null &&
+      if (selected !== null && selected.getSurroundParent() !== null &&
           !controller.isUserGenShadowBlock(selected.getSurroundParent().id)) {
         // Selected block is a valid shadow block or could be a valid shadow
         // block.
@@ -440,7 +376,7 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
       } else {
         // Selected block cannot be a valid shadow block.
 
-        if (selected != null && isInvalidBlockPlacement(selected)) {
+        if (selected !== null && isInvalidBlockPlacement(selected)) {
           // Selected block breaks shadow block rules.
           // Invalid shadow block if (1) a shadow block no longer has a valid
           // parent, or (2) a normal block is inside of a shadow block.
@@ -465,7 +401,7 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
           // be a shadow block.
 
           // Remove possible 'invalid shadow block placement' warning.
-          if (selected != null && controller.isDefinedBlock(selected) &&
+          if (selected !== null && controller.isDefinedBlock(selected) &&
               (!FactoryUtils.hasVariableField(selected) ||
               !controller.isUserGenShadowBlock(selected.id))) {
             selected.setWarningText(null);
@@ -481,7 +417,7 @@ WorkspaceFactoryInit.addWorkspaceFactoryEventListeners_ = function(controller) {
 
     // Convert actual shadow blocks added from the toolbox to user-generated
     // shadow blocks.
-    if (e.type == Blockly.Events.BLOCK_CREATE) {
+    if (e.type === Blockly.Events.BLOCK_CREATE) {
       controller.convertShadowBlocks();
 
       // Let the user create a Variables or Functions category if they use

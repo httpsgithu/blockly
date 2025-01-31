@@ -4,14 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="target-densitydpi=device-dpi, height=660, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Blockly Demo: Blockly Developer Tools</title>
-  <script src="../../blockly_compressed.js"></script>
-  <script src="../../javascript_compressed.js"></script>
-  <script src="../../msg/js/en.js"></script>
-  <script src="../../blocks_compressed.js"></script>
-  <script src="../../../closure-library/closure/goog/base.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/blockly_compressed.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/blocks_compressed.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/javascript_compressed.js"></script>
+  <script src="https://unpkg.com/blockly@10.4.3/msg/en.js"></script>
+  <script src="analytics.js"></script>
+  <script src="block_definition_extractor.js"></script>
   <script src="factory_utils.js"></script>
   <script src="workspacefactory/wfactory_model.js"></script>
   <script src="standard_categories.js"></script>
+  <script src="cp.js"></script>
   <script src="workspacefactory/wfactory_controller.js"></script>
   <script src="workspacefactory/wfactory_view.js"></script>
   <script src="workspacefactory/wfactory_generator.js"></script>
@@ -28,10 +30,13 @@
   <script src="app_controller.js"></script>
   <script src="/storage.js"></script>
   <link rel="stylesheet" href="factory.css">
-  <script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js"></script>
+  <link rel="stylesheet" href="cp.css">
+  <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
   <script>
     var blocklyFactory;
     var init = function() {
+      BlocklyDevTools.Analytics.init();
+
       blocklyFactory = new AppController();
       blocklyFactory.init();
       window.addEventListener('beforeunload', blocklyFactory.confirmLeavePage);
@@ -45,7 +50,12 @@
     <button id="helpButton" title="View documentation in new window.">
       <span>Help</span>
     </button>
+    <button class="privacyButton" title="Open Google privacy policy"><a class="privacyLink" href="https://policies.google.com/privacy">Privacy</a>
+    </button>
   </h1>
+  <div id="legacyBanner">
+    This version of Developer Tools is only compatible with Blockly version 10 and earlier. Try the <a target="_blank" href="https://google.github.io/blockly-samples/examples/developer-tools/index.html">new Block Factory</a> and <a target="_blank" href="https://developers.google.com/blockly/guides/create-custom-blocks/blockly-developer-tools#import_from_legacy_block_factory">learn how to migrate your blocks</a>.
+  </div>
   <div id="tabContainer">
     <div id="blockFactory_tab" class="tab tabon">Block Factory</div>
     <div id="blocklibraryExporter_tab" class="tab taboff">Block Exporter</div>
@@ -67,7 +77,7 @@
           <a id="dropdown_addAllFromLib" title="Select all block library blocks.">All Stored in Block Library</a>
           <a id="dropdown_addAllUsed" title="Select all block library blocks used in workspace factory.">All Used in Workspace Factory</a>
         </div>
-        <button id="clearSelectedButton" title="Clear selected blocks.">Clear Selected</a>
+        <button id="clearSelectedButton" title="Clear selected blocks.">Clear Selected</button>
       </div>
 
       <div id="blockSelector"></div>
@@ -119,11 +129,11 @@
       <h3>Export Preview</h3>
       <div id="blockDefs" class="exportPreviewTextArea">
         <p id="blockDefs_label">Block Definitions:</p>
-        <pre id="blockDefs_textArea"></pre>
+        <pre id="blockDefs_textArea" class="prettyprint lang-js"></pre>
       </div>
       <div id="genStubs" class="exportPreviewTextArea">
         <p id="genStubs_label">Generator Stubs:</p>
-        <pre id="genStubs_textArea"></pre>
+        <pre id="genStubs_textArea" class="prettyprint lang-js"></pre>
       </div>
     </div>
   </div>
@@ -136,9 +146,9 @@
         <div class="dropdown">
         <button id="button_importBlocks">Import Custom Blocks</button>
           <div id="dropdownDiv_importBlocks" class="dropdown-content">
-            <input type="file" id="input_importBlocksJson" accept=".js, .json, .txt" class="inputfile"</input>
+            <input type="file" id="input_importBlocksJson" accept=".js, .json, .txt" class="inputfile">
             <label for="input_importBlocksJson">From JSON</label>
-            <input type="file" id="input_importBlocksJs" accept=".js, .txt" class="inputfile"</input>
+            <input type="file" id="input_importBlocksJs" accept=".js, .txt" class="inputfile">
             <label for="input_importBlocksJs">From Javascript</label>
           </div>
         </div>
@@ -146,9 +156,9 @@
         <div class="dropdown">
         <button id="button_load">Load to Edit</button>
           <div id="dropdownDiv_load" class="dropdown-content">
-            <input type="file" id="input_loadToolbox" accept=".xml" class="inputfile"></input>
+            <input type="file" id="input_loadToolbox" accept=".xml" class="inputfile">
             <label for="input_loadToolbox">Toolbox</label>
-            <input type="file" id="input_loadPreload" accept=".xml" class="inputfile"</input>
+            <input type="file" id="input_loadPreload" accept=".xml" class="inputfile">
             <label for="input_loadPreload">Workspace Blocks</label>
           </div>
         </div>
@@ -204,10 +214,11 @@
 
         <br>
         <div class="dropdown">
-          <button id="button_editCategory">Edit Category</button>
+          <button id="button_editCategory">Edit Category...</button>
           <div id="dropdownDiv_editCategory" class="dropdown-content">
-            <a id='dropdown_name'>Name</a>
-            <a id='dropdown_color'>Colour</a>
+            <input id="categoryName">
+            <input id="categoryColour" value="000000">
+            <button id="categorySave">Save</button>
           </div>
         </div>
 
@@ -331,6 +342,9 @@
               <button id="localSaveButton" title="Save block library XML to a local file.">
                 <span>Download Block Library</span>
               </button>
+              <button id="exportAsJson" title="Export block library for import into the new Block Factory.">
+                <span>Export Block Library</span>
+              </button>
             </td>
           </tr>
         </table>
@@ -351,17 +365,28 @@
           <tr>
             <td height="5%">
               <h3>Block Definition:
+                <!-- TODO(#1268): Separate concerns of format and editable.
+                  -               Add "Editable" state toggle button? -->
                 <select id="format">
                   <option value="JSON">JSON</option>
                   <option value="JavaScript">JavaScript</option>
-                  <option value="Manual">Manual edit&hellip;</option>
+                  <option value="Manual-JSON">Manual JSON&hellip;</option>
+                  <script>
+                    // Manual JavaScript works but requires use of eval().
+                    // TODO(#1269): Replace eval() with JS-Interpreter before
+                    //              re-enabling "Manual JavaScript" mode.
+                    if (document.location.href.startsWith('file://')) {
+                      document.write(
+                          '<option value="Manual-JS">Manual JavaScript&hellip;</option>');
+                    }
+                  </script>
                 </select>
               </h3>
             </td>
           </tr>
           <tr>
             <td height="30%">
-              <pre id="languagePre"></pre>
+              <pre id="languagePre" class="prettyprint lang-js"></pre>
               <textarea id="languageTA"></textarea>
             </td>
           </tr>
@@ -380,7 +405,7 @@
           </tr>
           <tr>
             <td height="30%">
-              <pre id="generatorPre"></pre>
+              <pre id="generatorPre" class="prettyprint lang-js"></pre>
             </td>
           </tr>
         </table>
@@ -390,7 +415,7 @@
 
   <div id="modalShadow"></div>
 
-  <xml id="blockfactory_toolbox" class="toolbox">
+  <xml xmlns="https://developers.google.com/blockly/xml" id="blockfactory_toolbox" class="toolbox">
     <category name="Input">
       <block type="input_value">
         <value name="TYPE">
@@ -403,20 +428,17 @@
         </value>
       </block>
       <block type="input_dummy"></block>
+      <block type="input_end_row"></block>
     </category>
     <category name="Field">
       <block type="field_static"></block>
+      <block type="field_label_serializable"></block>
       <block type="field_input"></block>
       <block type="field_number"></block>
       <block type="field_angle"></block>
       <block type="field_dropdown"></block>
       <block type="field_checkbox"></block>
       <block type="field_colour"></block>
-      <!--
-      Date picker commented out since it increases footprint by 60%.
-      Add it only if you need it.  See also goog.require in blockly.js.
-      <block type="field_date"></block>
-      -->
       <block type="field_variable"></block>
       <block type="field_image"></block>
     </category>
@@ -442,7 +464,7 @@
     </category>
   </xml>
 
-  <xml id="workspacefactory_toolbox" class="toolbox">
+  <xml xmlns="https://developers.google.com/blockly/xml" id="workspacefactory_toolbox" class="toolbox">
     <category name="Logic" colour="210">
       <block type="controls_if"></block>
       <block type="logic_compare"></block>

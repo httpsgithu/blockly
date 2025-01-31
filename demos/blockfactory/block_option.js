@@ -1,35 +1,16 @@
 /**
  * @license
- * Blockly Demos: Block Factory
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
- * @fileoverview Javascript for the BlockOption class, used to represent each of
- * the various blocks that you may select. Each block option has a checkbox,
- * a label, and a preview workspace through which to view the block.
- *
- * @author quachtina96 (Tina Quach)
+ * @fileoverview Javascript for the BlockOption class, used to represent each
+ * of the various blocks that you may select in the Block Selector. Each block
+ * option has a checkbox, a label, and a preview workspace through which to
+ * view the block.
  */
 'use strict';
-
-goog.provide('BlockOption');
-goog.require('goog.dom');
-
 
  /**
  * BlockOption Class
@@ -63,55 +44,49 @@ var BlockOption = function(blockSelector, blockType, previewBlockXml) {
 };
 
 /**
- * Creates the dom for a single block option. Includes checkbox, label, and div
+ * Creates the DOM for a single block option. Includes checkbox, label, and div
  * in which to inject the preview block.
- * @return {!Element} Root node of the selector dom which consists of a
+ * @return {!Element} Root node of the selector DOM which consists of a
  * checkbox, a label, and a fixed size preview workspace per block.
  */
 BlockOption.prototype.createDom = function() {
   // Create the div for the block option.
-  var blockOptContainer = goog.dom.createDom('div', {
-    'id': this.blockType,
-    'class': 'blockOption'
-  }, ''); // Empty quotes for empty div.
+  var blockOptContainer = document.createElement('div');
+  blockOptContainer.id = this.blockType;
+  blockOptContainer.classList.add('blockOption');
 
   // Create and append div in which to inject the workspace for viewing the
   // block option.
-  var blockOptionPreview = goog.dom.createDom('div', {
-    'id' : this.blockType + '_workspace',
-    'class': 'blockOption_preview'
-  }, '');
+  var blockOptionPreview = document.createElement('div');
+  blockOptionPreview.id = this.blockType + '_workspace';
+  blockOptionPreview.classList.add('blockOption_preview');
   blockOptContainer.appendChild(blockOptionPreview);
 
   // Create and append container to hold checkbox and label.
-  var checkLabelContainer = goog.dom.createDom('div', {
-    'class': 'blockOption_checkLabel'
-  }, '');
+  var checkLabelContainer = document.createElement('div');
+  checkLabelContainer.classList.add('blockOption_checkLabel');
   blockOptContainer.appendChild(checkLabelContainer);
 
   // Create and append container for checkbox.
-  var checkContainer = goog.dom.createDom('div', {
-    'class': 'blockOption_check'
-  }, '');
+  var checkContainer = document.createElement('div');
+  checkContainer.classList.add('blockOption_check');
   checkLabelContainer.appendChild(checkContainer);
 
   // Create and append checkbox.
-  this.checkbox = goog.dom.createDom('input', {
-    'type': 'checkbox',
-    'id': this.blockType + '_check'
-  }, '');
+  this.checkbox = document.createElement('input');
+  this.checkbox.id = this.blockType + '_check';
+  this.checkbox.setAttribute('type', 'checkbox');
   checkContainer.appendChild(this.checkbox);
 
   // Create and append container for block label.
-  var labelContainer = goog.dom.createDom('div', {
-    'class': 'blockOption_label'
-  }, '');
+  var labelContainer = document.createElement('div');
+  labelContainer.classList.add('blockOption_label');
   checkLabelContainer.appendChild(labelContainer);
 
   // Create and append text node for the label.
-  var labelText = goog.dom.createDom('p', {
-    'id': this.blockType + '_text'
-  }, this.blockType);
+  var labelText = document.createElement('p');
+  labelText.id = this.blockType + '_text';
+  labelText.textContent = this.blockType;
   labelContainer.appendChild(labelText);
 
   this.dom = blockOptContainer;
@@ -126,9 +101,9 @@ BlockOption.prototype.showPreviewBlock = function() {
   var blockOptPreviewID = this.dom.id + '_workspace';
 
   // Inject preview block.
-  var workspace = Blockly.inject(blockOptPreviewID, {readOnly:true});
-  Blockly.Xml.domToWorkspace(this.previewBlockXml, workspace);
-  this.previewWorkspace = workspace;
+  var demoWorkspace = Blockly.inject(blockOptPreviewID, {readOnly:true});
+  Blockly.Xml.domToWorkspace(this.previewBlockXml, demoWorkspace);
+  this.previewWorkspace = demoWorkspace;
 
   // Center the preview block in the workspace.
   this.centerBlock();

@@ -1,45 +1,22 @@
 /**
  * @license
- * Blockly Demos: Block Factory
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
  * @fileoverview Javascript for the Block Exporter View class. Reads from and
  * manages a block selector through which users select blocks to export.
- *
- * @author quachtina96 (Tina Quach)
  */
 
 'use strict';
-
-goog.provide('BlockExporterView');
-
-goog.require('BlockExporterTools');
-goog.require('BlockOption');
-goog.require('goog.dom');
-
 
 /**
  * BlockExporter View Class
  * @param {!Object} blockOptions Map of block types to BlockOption objects.
  * @constructor
  */
-BlockExporterView = function(blockOptions) {
+function BlockExporterView(blockOptions) {
   //  Map of block types to BlockOption objects to select from.
   this.blockOptions = blockOptions;
 };
@@ -72,7 +49,7 @@ BlockExporterView.prototype.select = function(blockType) {
 
 /**
  * Deselects a block in the selector.
- * @param {!Blockly.Block} block Type of block to add to selector workspce.
+ * @param {!Blockly.Block} block Type of block to add to selector workspace.
  */
 BlockExporterView.prototype.deselect = function(blockType) {
   this.blockOptions[blockType].setSelected(false);
@@ -91,7 +68,7 @@ BlockExporterView.prototype.deselectAllBlocks = function() {
 /**
  * Given an array of selected blocks, selects these blocks in the view, marking
  * the checkboxes accordingly.
- * @param {Array.<Blockly.Block>} blockTypes Array of block types to select.
+ * @param {Array<Blockly.Block>} blockTypes Array of block types to select.
  */
 BlockExporterView.prototype.setSelectedBlockTypes = function(blockTypes) {
   for (var i = 0, blockType; blockType = blockTypes[i]; i++) {
@@ -101,7 +78,7 @@ BlockExporterView.prototype.setSelectedBlockTypes = function(blockTypes) {
 
 /**
  * Returns array of selected blocks.
- * @return {!Array.<string>} Array of all selected block types.
+ * @return {!Array<string>} Array of all selected block types.
  */
 BlockExporterView.prototype.getSelectedBlockTypes = function() {
   var selectedTypes = [];

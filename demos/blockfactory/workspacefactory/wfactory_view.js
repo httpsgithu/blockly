@@ -1,21 +1,7 @@
 /**
  * @license
- * Blockly Demos: Block Factory
- *
- * Copyright 2016 Google Inc.
- * https://developers.google.com/blockly/
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /**
@@ -24,11 +10,8 @@
  * Depends on WorkspaceFactoryController (for adding mouse listeners). Tabs for
  * each category are stored in tab map, which associates a unique ID for a
  * category with a particular tab.
- *
- * @author Emma Dauterman (edauterman)
  */
 
-goog.require('FactoryUtils');
 
 /**
  * Class for a WorkspaceFactoryView
@@ -50,7 +33,7 @@ WorkspaceFactoryView.prototype.addCategoryRow = function(name, id) {
   var count = table.rows.length;
 
   // Delete help label and enable category buttons if it's the first category.
-  if (count == 0) {
+  if (count === 0) {
     document.getElementById('categoryHeader').textContent = 'Your categories:';
   }
 
@@ -110,7 +93,7 @@ WorkspaceFactoryView.prototype.addEmptyCategoryMessage = function() {
 WorkspaceFactoryView.prototype.updateState = function(selectedIndex, selected) {
   // Disable/enable editing buttons as necessary.
   document.getElementById('button_editCategory').disabled = selectedIndex < 0 ||
-      selected.type != ListElement.TYPE_CATEGORY;
+      selected.type !== ListElement.TYPE_CATEGORY;
   document.getElementById('button_remove').disabled = selectedIndex < 0;
   document.getElementById('button_up').disabled = selectedIndex <= 0;
   var table = document.getElementById('categoryTable');
@@ -138,7 +121,7 @@ WorkspaceFactoryView.prototype.createCategoryIdName = function(name) {
 WorkspaceFactoryView.prototype.setCategoryTabSelection =
     function(id, selected) {
   if (!this.tabMap[id]) {
-    return;   // Exit if tab does not exist.
+    return;  // Exit if tab does not exist.
   }
   this.tabMap[id].className = selected ? 'tabon' : 'taboff';
 };
@@ -150,7 +133,7 @@ WorkspaceFactoryView.prototype.setCategoryTabSelection =
  * @param {!Function} func Function to be executed on click.
  */
 WorkspaceFactoryView.prototype.bindClick = function(el, func) {
-  if (typeof el == 'string') {
+  if (typeof el === 'string') {
     el = document.getElementById(el);
   }
   el.addEventListener('click', func, true);
@@ -160,8 +143,8 @@ WorkspaceFactoryView.prototype.bindClick = function(el, func) {
 /**
  * Creates a file and downloads it. In some browsers downloads, and in other
  * browsers, opens new tab with contents.
- * @param {string} filename Name of file
- * @param {!Blob} data Blob containing contents to download
+ * @param {string} filename Name of file.
+ * @param {!Blob} data Blob containing contents to download.
  */
 WorkspaceFactoryView.prototype.createAndDownloadFile =
     function(filename, data) {
@@ -180,8 +163,8 @@ WorkspaceFactoryView.prototype.createAndDownloadFile =
 /**
  * Given the ID of a certain category, updates the corresponding tab in
  * the DOM to show a new name.
- * @param {string} newName Name of string to be displayed on tab
- * @param {string} id ID of category to be updated
+ * @param {string} newName Name of string to be displayed on tab.
+ * @param {string} id ID of category to be updated.
  */
 WorkspaceFactoryView.prototype.updateCategoryName = function(newName, id) {
   this.tabMap[id].textContent = newName;
@@ -202,7 +185,7 @@ WorkspaceFactoryView.prototype.moveTabToIndex =
   // Check that indexes are in bounds.
   if (newIndex < 0 || newIndex >= table.rows.length || oldIndex < 0 ||
       oldIndex >= table.rows.length) {
-    throw new Error('Index out of bounds when moving tab in the view.');
+    throw Error('Index out of bounds when moving tab in the view.');
   }
 
   if (newIndex < oldIndex) {
@@ -219,17 +202,23 @@ WorkspaceFactoryView.prototype.moveTabToIndex =
 };
 
 /**
- * Given a category ID and color, use that color to color the left border of the
- * tab for that category.
- * @param {string} id The ID of the category to color.
- * @param {string} color The color for to be used for the border of the tab.
- * Must be a valid CSS string.
+ * Given a category ID and colour, use that colour to colour the left border of
+ * the tab for that category.
+ * @param {string} id The ID of the category to colour.
+ * @param {?string} colour The colour for to be used for the border of the tab,
+ *   or null if none.  Must be a valid CSS string.
  */
-WorkspaceFactoryView.prototype.setBorderColor = function(id, color) {
-  var tab = this.tabMap[id];
-  tab.style.borderLeftWidth = '8px';
-  tab.style.borderLeftStyle = 'solid';
-  tab.style.borderColor = color;
+WorkspaceFactoryView.prototype.setBorderColour = function(id, colour) {
+  var style = this.tabMap[id].style;
+  if (colour) {
+    style.borderLeftWidth = '8px';
+    style.borderLeftStyle = 'solid';
+    style.borderColor = colour;
+  } else {
+    style.borderLeftWidth = '';
+    style.borderLeftStyle = '';
+    style.borderColor = '';
+  }
 };
 
 /**
@@ -242,7 +231,7 @@ WorkspaceFactoryView.prototype.addSeparatorTab = function(id) {
   var table = document.getElementById('categoryTable');
   var count = table.rows.length;
 
-  if (count == 0) {
+  if (count === 0) {
     document.getElementById('categoryHeader').textContent = 'Your categories:';
   }
   // Create separator.
@@ -280,9 +269,9 @@ WorkspaceFactoryView.prototype.disableWorkspace = function(disable) {
  * @return {boolean} True if the workspace should be disabled, false otherwise.
  */
 WorkspaceFactoryView.prototype.shouldDisableWorkspace = function(category) {
-  return category != null && category.type != ListElement.TYPE_FLYOUT &&
-      (category.type == ListElement.TYPE_SEPARATOR ||
-      category.custom == 'VARIABLE' || category.custom == 'PROCEDURE');
+  return category !== null && category.type !== ListElement.TYPE_FLYOUT &&
+      (category.type === ListElement.TYPE_SEPARATOR ||
+      category.custom === 'VARIABLE' || category.custom === 'PROCEDURE');
 };
 
 /**
@@ -303,7 +292,7 @@ WorkspaceFactoryView.prototype.clearToolboxTabs = function() {
  * Given a set of blocks currently loaded user-generated shadow blocks, visually
  * marks them without making them actual shadow blocks (allowing them to still
  * be editable and movable).
- * @param {!Array.<!Blockly.Block>} blocks Array of user-generated shadow blocks
+ * @param {!Array<!Blockly.Block>} blocks Array of user-generated shadow blocks
  * currently loaded.
  */
 WorkspaceFactoryView.prototype.markShadowBlocks = function(blocks) {
@@ -321,7 +310,7 @@ WorkspaceFactoryView.prototype.markShadowBlocks = function(blocks) {
  */
 WorkspaceFactoryView.prototype.markShadowBlock = function(block) {
   // Add Blockly CSS for user-generated shadow blocks.
-  Blockly.utils.addClass(block.svgGroup_, 'shadowBlock');
+  block.getSvgRoot().classList.add('shadowBlock');
   // If not a valid shadow block, add a warning message.
   if (!block.getSurroundParent()) {
       block.setWarningText('Shadow blocks must be nested inside' +
@@ -339,23 +328,23 @@ WorkspaceFactoryView.prototype.markShadowBlock = function(block) {
  */
 WorkspaceFactoryView.prototype.unmarkShadowBlock = function(block) {
   // Remove Blockly CSS for user-generated shadow blocks.
-  Blockly.utils.removeClass(block.svgGroup_, 'shadowBlock');
+  block.getSvgRoot().classList.remove('shadowBlock');
 };
 
 /**
- * Sets the tabs for modes according to which mode the user is currenly
+ * Sets the tabs for modes according to which mode the user is currently
  * editing in.
  * @param {string} mode The mode being switched to
  *   (WorkspaceFactoryController.MODE_TOOLBOX or WorkspaceFactoryController.MODE_PRELOAD).
  */
 WorkspaceFactoryView.prototype.setModeSelection = function(mode) {
-  document.getElementById('tab_preload').className = mode ==
+  document.getElementById('tab_preload').className = mode ===
       WorkspaceFactoryController.MODE_PRELOAD ? 'tabon' : 'taboff';
-  document.getElementById('preload_div').style.display = mode ==
+  document.getElementById('preload_div').style.display = mode ===
       WorkspaceFactoryController.MODE_PRELOAD ? 'block' : 'none';
-  document.getElementById('tab_toolbox').className = mode ==
+  document.getElementById('tab_toolbox').className = mode ===
       WorkspaceFactoryController.MODE_TOOLBOX ? 'tabon' : 'taboff';
-  document.getElementById('toolbox_div').style.display = mode ==
+  document.getElementById('toolbox_div').style.display = mode ===
       WorkspaceFactoryController.MODE_TOOLBOX ? 'block' : 'none';
 };
 
@@ -365,7 +354,7 @@ WorkspaceFactoryView.prototype.setModeSelection = function(mode) {
  *   WorkspaceFactoryController.MODE_PRELOAD).
  */
 WorkspaceFactoryView.prototype.updateHelpText = function(mode) {
-  if (mode == WorkspaceFactoryController.MODE_TOOLBOX) {
+  if (mode === WorkspaceFactoryController.MODE_TOOLBOX) {
     var helpText = 'Drag blocks into the workspace to configure the toolbox ' +
         'in your custom workspace.';
   } else {
@@ -397,8 +386,7 @@ WorkspaceFactoryView.prototype.setBaseOptions = function() {
 
   // Check infinite blocks and hide suboption.
   document.getElementById('option_infiniteBlocks_checkbox').checked = true;
-  document.getElementById('maxBlockNumber_option').style.display =
-      'none';
+  document.getElementById('maxBlockNumber_option').style.display = 'none';
 
   // Uncheck grid and zoom options and hide suboptions.
   document.getElementById('option_grid_checkbox').checked = false;
